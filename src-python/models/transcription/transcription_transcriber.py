@@ -9,6 +9,11 @@ from io import BytesIO
 from threading import Event
 import wave
 from typing import Any, Dict, List, Optional, Union
+import os
+try:
+    import requests
+except Exception:
+    requests = None
 from speech_recognition import Recognizer, AudioData, AudioFile
 from speech_recognition.exceptions import UnknownValueError
 from datetime import timedelta
@@ -61,6 +66,10 @@ class AudioTranscriber:
         self.audio_recognizer = Recognizer()
         self.transcription_engine = "Google"
         self.whisper_model = None
+        self.funasr_api_url = os.getenv("FUNASR_API_URL", "").strip()
+        self.funasr_api_key = os.getenv("FUNASR_API_KEY", "").strip()
+        self.funasr_timeout_sec = int(os.getenv("FUNASR_TIMEOUT_SEC", "15"))
+        self.funasr_max_retries = int(os.getenv("FUNASR_MAX_RETRIES", "2"))
         self.audio_sources: Dict[str, Any] = {
             "sample_rate": source.SAMPLE_RATE,
             "sample_width": source.SAMPLE_WIDTH,
@@ -68,10 +77,13 @@ class AudioTranscriber:
             "last_sample": bytes(),
             "last_spoken": None,
             "new_phrase": True,
-            "process_data_func": self.processSpeakerData if speaker else self.processSpeakerData,
+            "process_data_func": self.processSpeakerData if speaker else self.processMicData,
         }
 
-        if transcription_engine == "Whisper" and checkWhisperWeight(root, whisper_weight_type) is True:
+        if transcription_engine == "FunASR" and self.funasr_api_url:
+            self.transcription_engine = "FunASR"
+
+        elif transcription_engine == "Whisper" and checkWhisperWeight(root, whisper_weight_type) is True:
             self.whisper_model = getWhisperModel(
                 root, whisper_weight_type, device=device, device_index=device_index, compute_type=compute_type
             )
@@ -109,6 +121,12 @@ class AudioTranscriber:
                             confidences.append({"confidence": confidence, "text": text, "language": language})
                         except Exception:
                             pass
+
+                case "FunASR":
+                    text = self._transcribe_with_funasr(audio_data)
+                    if text:
+                        lang = languages[0] if len(languages) > 0 else None
+                        confidences.append({"confidence": 1.0, "text": text, "language": lang})
                 case "Whisper":
                     audio_data = np.frombuffer(
                         audio_data.get_raw_data(convert_rate=16000, convert_width=2), np.int16
@@ -158,6 +176,43 @@ class AudioTranscriber:
         if result["text"] != "":
             self.updateTranscript(result)
         return True
+
+
+    def _transcribe_with_funasr(self, audio_data: AudioData) -> str:
+        if (not self.funasr_api_url) or requests is None:
+            return ""
+        wav_bytes = audio_data.get_wav_data()
+        files = {"file": ("audio.wav", wav_bytes, "audio/wav")}
+        headers = {}
+        if self.funasr_api_key:
+            headers["Authorization"] = f"Bearer {self.funasr_api_key}"
+        for _ in range(max(1, self.funasr_max_retries)):
+            try:
+                resp = requests.post(self.funasr_api_url, files=files, headers=headers, timeout=self.funasr_timeout_sec)
+                resp.raise_for_status()
+                data = resp.json()
+                text = self._extract_funasr_text(data)
+                if text:
+                    return text
+            except Exception:
+                continue
+        return ""
+
+    def _extract_funasr_text(self, data: Any) -> str:
+        if isinstance(data, dict):
+            for key in ("text", "result", "transcript"):
+                v = data.get(key)
+                if isinstance(v, str):
+                    return v.strip()
+                if isinstance(v, dict):
+                    nested = self._extract_funasr_text(v)
+                    if nested:
+                        return nested
+                if isinstance(v, list):
+                    return " ".join([str(x).strip() for x in v if str(x).strip()]).strip()
+        if isinstance(data, list):
+            return " ".join([self._extract_funasr_text(x) if not isinstance(x, str) else x.strip() for x in data]).strip()
+        return ""
 
     def updateLastSampleAndPhraseStatus(self, data: bytes, time_spoken) -> None:
         source_info = self.audio_sources

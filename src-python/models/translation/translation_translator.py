@@ -185,6 +185,19 @@ class Translator:
         """Update the OpenAI client (fetch available models)."""
         self.openai_client.updateClient()
 
+
+    def authenticationQwenMTAuthKey(self, auth_key: str, base_url: str | None = None, root_path: str = None) -> bool:
+        """Authenticate Qwen-MT using OpenAI-compatible API."""
+        return self.authenticationOpenAIAuthKey(auth_key=auth_key, base_url=base_url, root_path=root_path)
+
+    def getQwenMTModelList(self) -> list[str]:
+        """Get available Qwen-MT models (OpenAI-compatible)."""
+        return self.getOpenAIModelList()
+
+    def setQwenMTModel(self, model: str) -> bool:
+        """Set Qwen-MT model (OpenAI-compatible)."""
+        return self.setOpenAIModel(model)
+
     def authenticationGroqAuthKey(self, auth_key: str, root_path: str = None) -> bool:
         """Authenticate Groq API with the provided key.
 
@@ -490,7 +503,7 @@ class Translator:
                             input_lang=source_language,
                             output_lang=target_language,
                             )
-                case "OpenAI_API":
+                case "OpenAI_API" | "Qwen_MT_API":
                     if self.openai_client is None:
                         result = False
                     else:

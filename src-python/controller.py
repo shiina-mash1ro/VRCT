@@ -3230,6 +3230,16 @@ class Controller:
                                 status = True
                             else:
                                 auth_key_invalid = True
+                    case "Qwen_MT_API":
+                        if config.AUTH_KEYS[engine] is None:
+                            status = False
+                        else:
+                            if model.authenticationTranslatorQwenMTAuthKey(auth_key=config.AUTH_KEYS[engine]) is True:
+                                model_list = model.getTranslatorQwenMTModelList()
+                                selected_model = config.SELECTED_OPENAI_MODEL if config.SELECTED_OPENAI_MODEL in model_list else model_list[0]
+                                status = True
+                            else:
+                                auth_key_invalid = True
                     case "Groq_API":
                         if config.AUTH_KEYS[engine] is None:
                             status = False
@@ -3329,6 +3339,11 @@ class Controller:
                         config.SELECTABLE_OPENAI_MODEL_LIST = model_list
                         config.SELECTED_OPENAI_MODEL = selected_model
                         model.setTranslatorOpenAIModel(selected_model)
+                        model.updateTranslatorOpenAIClient()
+                    case "Qwen_MT_API":
+                        config.SELECTABLE_OPENAI_MODEL_LIST = model_list
+                        config.SELECTED_OPENAI_MODEL = selected_model
+                        model.setTranslatorQwenMTModel(selected_model)
                         model.updateTranslatorOpenAIClient()
                     case "Groq_API":
                         config.SELECTABLE_GROQ_MODEL_LIST = model_list

@@ -259,6 +259,20 @@ class Model:
         self.ensure_initialized()
         self.translator.updateOpenAIClient()
 
+
+    def authenticationTranslatorQwenMTAuthKey(self, auth_key: str, base_url: Optional[str] = None) -> bool:
+        result = self.translator.authenticationQwenMTAuthKey(auth_key, base_url=base_url, root_path=config.PATH_LOCAL)
+        return result
+
+    def getTranslatorQwenMTModelList(self) -> list[str]:
+        self.ensure_initialized()
+        return self.translator.getQwenMTModelList()
+
+    def setTranslatorQwenMTModel(self, model: str) -> bool:
+        self.ensure_initialized()
+        result = self.translator.setQwenMTModel(model=model)
+        return result
+
     def authenticationTranslatorGroqAuthKey(self, auth_key: str) -> bool:
         result = self.translator.authenticationGroqAuthKey(auth_key, root_path=config.PATH_LOCAL)
         return result

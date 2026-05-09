@@ -945,6 +945,7 @@ class Config:
             "Plamo_API": None,
             "Gemini_API": None,
             "OpenAI_API": None,
+            "Qwen_MT_API": None,
             "Groq_API": None,
             "OpenRouter_API": None,
         }
